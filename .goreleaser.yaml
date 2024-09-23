@@ -1,7 +1,7 @@
 project_name: pod-image-aging
 
 builds:
-  - main: ./cmd/main.go
+  - main: ./cmd/
     goos:
       - linux
     goarch:
@@ -10,26 +10,16 @@ builds:
     ldflags:
       - -s -w
 
-dockers:
-  - image_templates:
-      - "hebestreit/pod-image-aging:{{ .Tag }}-amd64"
-    use: buildx
-    build_flag_templates:
-      - "--pull"
-      - "--platform=linux/amd64"
-  - image_templates:
-      - "hebestreit/pod-image-aging:{{ .Tag }}-arm64"
-    use: buildx
-    build_flag_templates:
-      - "--pull"
-      - "--platform=linux/arm64"
-    goarch: arm64
-
-docker_manifests:
-  - name_template: "hebestreit/pod-image-aging:{{ .Tag }}"
-    image_templates:
-      - "hebestreit/pod-image-aging:{{ .Tag }}-amd64"
-      - "hebestreit/pod-image-aging:{{ .Tag }}-arm64"
+kos:
+  - repository: hebestreit/pod-image-aging
+    tags:
+      - "{{.Version}}"
+      - latest
+    bare: true
+    preserve_import_paths: false
+    platforms:
+      - linux/amd64
+      - linux/arm64
 
 release:
   github:
