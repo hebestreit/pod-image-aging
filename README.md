@@ -1,8 +1,71 @@
 # pod-image-aging
-// TODO(user): Add simple overview of use/purpose
+
+The `pod-image-aging` Kubernetes controller tracks the age of your pod's container images and stores the created at timestamp inside an annotation. 
+This information can be useful to track the age of the images in your pods and help you to identify the pods that are running old images.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+
+The `pod-image-aging` controller watches for pods in your cluster and extracts the image information from the pod's spec to fetch the created at timestamp from the corresponding container image registry.
+
+Once annotated you can inspect your pod and get the image creation timestamp of all `containers` and `initContainers` from the `pod-image-aging.hbst.io/status` annotation.
+
+```yaml
+apiVersion: v1                                                                                                                                                                          
+kind: Pod                                                                                                                                                                               
+metadata:                                                                                                                                                                               
+  annotations:                                                                                                                                                                          
+    pod-image-aging.hbst.io/status: '{"containers":[{"name":"pod-image-aging","createdAt":"2024-09-08T06:45:26Z"}]}'                                                                  
+  name: pod-image-aging-6f6b769dd6-fnplf                                                                                                                                                
+  namespace: default   
+spec:
+  containers:
+    - image: hebestreit/pod-image-aging:0.0.1
+      imagePullPolicy: IfNotPresent
+# ...                 
+```
+
+If you want to get an overview of all pods and their image creation timestamps, you can execute the following command using `kubectl` and `jq`:
+
+```
+$  kubectl get pods -A -o json | jq '[. | {pod: .items[].metadata}][] | {name: .pod.name, namespace: .pod.namespace, images: .pod.annotations["pod-image-aging.hbst.io/status"] | fromjson}'
+
+{
+  "name": "metrics-server-648b5df564-fz9hd",
+  "namespace": "kube-system",
+  "images": {
+    "containers": [
+      {
+        "name": "metrics-server",
+        "createdAt": "2023-03-21T13:21:03.301449922Z"
+      }
+    ]
+  }
+}
+{
+  "name": "traefik-64f55bb67d-n548j",
+  "namespace": "kube-system",
+  "images": {
+    "containers": [
+      {
+        "name": "traefik",
+        "createdAt": "2023-04-06T18:51:04.986454508Z"
+      }
+    ]
+  }
+}
+{
+  "name": "pod-image-aging-6f6b769dd6-fnplf",
+  "namespace": "default",
+  "images": {
+    "containers": [
+      {
+        "name": "pod-image-aging",
+        "createdAt": "2024-09-08T06:45:26Z"
+      }
+    ]
+  }
+}
+```
 
 ## Getting Started
 
