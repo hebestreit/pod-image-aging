@@ -57,14 +57,13 @@ type StatusAnnotation struct {
 }
 
 type Container struct {
-	Name string `json:"name"`
-	// TODO rename to Created?
-	LastUpdated *time.Time `json:"lastUpdated"`
+	Name      string     `json:"name"`
+	CreatedAt *time.Time `json:"createdAt"`
 }
 
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update
-// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
+// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list
+// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;patch
+// +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -123,14 +122,14 @@ containerStatuses:
 			continue containerStatuses
 		}
 
-		imageCreated, err := getImageLastUpdated(ctx, r.Cache, l, container, node)
+		imageCreated, err := getImageCreatedAt(ctx, r.Cache, l, container, node)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
 		containers = append(containers, Container{
-			Name:        container.Name,
-			LastUpdated: imageCreated,
+			Name:      container.Name,
+			CreatedAt: imageCreated,
 		})
 	}
 
@@ -142,14 +141,14 @@ initContainerStatuses:
 			continue initContainerStatuses
 		}
 
-		imageCreated, err := getImageLastUpdated(ctx, r.Cache, l, container, node)
+		imageCreated, err := getImageCreatedAt(ctx, r.Cache, l, container, node)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
 		initContainers = append(initContainers, Container{
-			Name:        container.Name,
-			LastUpdated: imageCreated,
+			Name:      container.Name,
+			CreatedAt: imageCreated,
 		})
 	}
 
@@ -268,7 +267,7 @@ func isImageInWildcardFilter(image string, wildcardFilters []string) bool {
 	return false
 }
 
-func getImageLastUpdated(ctx context.Context, cache *cache.Cache, l logr.Logger, container corev1.ContainerStatus, node corev1.Node) (*time.Time, error) {
+func getImageCreatedAt(ctx context.Context, cache *cache.Cache, l logr.Logger, container corev1.ContainerStatus, node corev1.Node) (*time.Time, error) {
 	imageCreated, found := cache.Get(container.ImageID)
 	if found {
 		l.Info("Using cached image creation date", "Name", container.Name, "ImageID", container.ImageID, "Created", imageCreated)

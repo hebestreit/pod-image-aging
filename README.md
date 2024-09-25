@@ -23,12 +23,6 @@ make docker-build docker-push IMG=<some-registry>/pod-image-aging:tag
 And it is required to have access to pull the image from the working environment.
 Make sure you have the proper permission to the registry if the above commands don’t work.
 
-**Install the CRDs into the cluster:**
-
-```sh
-make install
-```
-
 **Deploy the Manager to the cluster with the image specified by `IMG`:**
 
 ```sh
@@ -52,12 +46,6 @@ kubectl apply -k config/samples/
 
 ```sh
 kubectl delete -k config/samples/
-```
-
-**Delete the APIs(CRDs) from the cluster:**
-
-```sh
-make uninstall
 ```
 
 **UnDeploy the controller from the cluster:**
