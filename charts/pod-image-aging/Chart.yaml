@@ -1,0 +1,8 @@
+apiVersion: v2
+name: pod-image-aging
+description: A Helm chart to install the pod-image-aging controller
+sources:
+  - https://github.com/hebestreit/pod-image-aging
+type: application
+version: 0.1.0
+appVersion: "0.0.1"

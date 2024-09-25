@@ -61,7 +61,7 @@ type Container struct {
 	CreatedAt *time.Time `json:"createdAt"`
 }
 
-// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list
+// +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;patch
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get
 
