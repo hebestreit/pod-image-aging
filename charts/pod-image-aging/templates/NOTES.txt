@@ -1,8 +1,7 @@
-Thank you for installing pod-image-aging.
+Thank you for installing pod-image-aging!
 
-In case you have any questions, please refer to the documentation:
+In case you have any questions, issues or feature requests, please feel free to open an issue at:
 https://github.com/hebestreit/pod-image-aging
 
 Once installed you can list all pods with their image age by running:
-
-  $  kubectl get pods -A -o json | jq '[. | {pod: .items[].metadata}][] | {name: .pod.name, images: .pod.annotations["pod-image-aging.hbst.io/status"] | fromjson}'
+  $  kubectl get pods -A -o json | jq '[. | {pod: .items[].metadata}][] | {name: .pod.name, namespace: .pod.namespace, images: (.pod.annotations["pod-image-aging.hbst.io/status"] // "{}")| fromjson}'

@@ -40,8 +40,7 @@ import (
 )
 
 const (
-	cacheExpiration = 168 * time.Hour
-	domain          = "pod-image-aging.hbst.io"
+	domain = "pod-image-aging.hbst.io"
 )
 
 // PodReconciler reconciles a Pod object
@@ -49,6 +48,16 @@ type PodReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	Cache  *cache.Cache
+	Opts   *Opts
+}
+
+type Opts struct {
+	IncludeNamespacesFilter string
+	ExcludeNamespacesFilter string
+	IncludeImagesFilter     string
+	ExcludeImagesFilter     string
+	CacheExpiration         time.Duration
+	DockerAuthConfigPath    string
 }
 
 type StatusAnnotation struct {
@@ -57,8 +66,8 @@ type StatusAnnotation struct {
 }
 
 type Container struct {
-	Name      string     `json:"name"`
-	CreatedAt *time.Time `json:"createdAt"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"createdAt"`
 }
 
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
@@ -67,13 +76,6 @@ type Container struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Pod object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := log.FromContext(ctx)
 
@@ -88,17 +90,13 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	// TODO move this to --include-namespaces, --exclude-namespaces, --include-images and --exclude-images flags
-	includeNamespacesFilter := ""
-	excludeNamespacesFilter := ""
-	includeImageFilter := ""
-	excludeImageFilter := "066635153087.dkr.ecr.il-central-1.amazonaws.com/*,602401143452.dkr.ecr.eu-central-1.amazonaws.com/*"
-	includeNamespaces := strings.Split(includeNamespacesFilter, ",")
-	excludeNamespaces := strings.Split(excludeNamespacesFilter, ",")
-	includeImages := strings.Split(includeImageFilter, ",")
-	excludeImages := strings.Split(excludeImageFilter, ",")
+	opts := r.Opts
+	includeNamespaces := strings.Split(opts.IncludeNamespacesFilter, ",")
+	excludeNamespaces := strings.Split(opts.ExcludeNamespacesFilter, ",")
+	includeImages := strings.Split(opts.IncludeImagesFilter, ",")
+	excludeImages := strings.Split(opts.ExcludeImagesFilter, ",")
 
-	if (includeNamespacesFilter != "" && !slices.Contains(includeNamespaces, pod.Namespace)) || (excludeNamespacesFilter != "" && slices.Contains(excludeNamespaces, pod.Namespace)) {
+	if (opts.IncludeNamespacesFilter != "" && !slices.Contains(includeNamespaces, pod.Namespace)) || (opts.ExcludeNamespacesFilter != "" && slices.Contains(excludeNamespaces, pod.Namespace)) {
 		return ctrl.Result{}, nil
 	}
 
@@ -112,43 +110,41 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	// TODO check if there are other circumstances where the pod should be ignored
-
 	var containers []Container
 containerStatuses:
 	for _, container := range pod.Status.ContainerStatuses {
-		if (includeImageFilter != "" && !isImageInWildcardFilter(container.Image, includeImages)) ||
-			(excludeImageFilter != "" && isImageInWildcardFilter(container.Image, excludeImages)) {
+		if (opts.IncludeImagesFilter != "" && !isImageInWildcardFilter(container.Image, includeImages)) ||
+			(opts.ExcludeImagesFilter != "" && isImageInWildcardFilter(container.Image, excludeImages)) {
 			continue containerStatuses
 		}
 
-		imageCreated, err := getImageCreatedAt(ctx, r.Cache, l, container, node)
+		imageCreated, err := getImageCreatedAt(ctx, r.Cache, l, container, node, opts)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
 		containers = append(containers, Container{
 			Name:      container.Name,
-			CreatedAt: imageCreated,
+			CreatedAt: imageCreated.Format(time.RFC3339),
 		})
 	}
 
 	var initContainers []Container
 initContainerStatuses:
 	for _, container := range pod.Status.InitContainerStatuses {
-		if (includeImageFilter != "" && !isImageInWildcardFilter(container.Image, includeImages)) ||
-			(excludeImageFilter != "" && isImageInWildcardFilter(container.Image, excludeImages)) {
+		if (opts.IncludeImagesFilter != "" && !isImageInWildcardFilter(container.Image, includeImages)) ||
+			(opts.ExcludeImagesFilter != "" && isImageInWildcardFilter(container.Image, excludeImages)) {
 			continue initContainerStatuses
 		}
 
-		imageCreated, err := getImageCreatedAt(ctx, r.Cache, l, container, node)
+		imageCreated, err := getImageCreatedAt(ctx, r.Cache, l, container, node, opts)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
 		initContainers = append(initContainers, Container{
 			Name:      container.Name,
-			CreatedAt: imageCreated,
+			CreatedAt: imageCreated.Format(time.RFC3339),
 		})
 	}
 
@@ -198,8 +194,12 @@ func (r *PodReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func inspectImage(ctx context.Context, container *corev1.ContainerStatus, os, architecture string) (*types.ImageInspectInfo, error) {
-	sysCtx := &types.SystemContext{ArchitectureChoice: architecture, OSChoice: os}
+func inspectImage(ctx context.Context, container *corev1.ContainerStatus, os, architecture string, dockerAuthConfigPath string) (*types.ImageInspectInfo, error) {
+	sysCtx := &types.SystemContext{
+		ArchitectureChoice:       architecture,
+		OSChoice:                 os,
+		DockerCompatAuthFilePath: dockerAuthConfigPath,
+	}
 
 	imageName := container.ImageID
 	if strings.Contains(imageName, "@sha256:") && strings.Contains(imageName, ":") {
@@ -267,7 +267,7 @@ func isImageInWildcardFilter(image string, wildcardFilters []string) bool {
 	return false
 }
 
-func getImageCreatedAt(ctx context.Context, cache *cache.Cache, l logr.Logger, container corev1.ContainerStatus, node corev1.Node) (*time.Time, error) {
+func getImageCreatedAt(ctx context.Context, cache *cache.Cache, l logr.Logger, container corev1.ContainerStatus, node corev1.Node, opts *Opts) (*time.Time, error) {
 	imageCreated, found := cache.Get(container.ImageID)
 	if found {
 		l.Info("Using cached image creation date", "Name", container.Name, "ImageID", container.ImageID, "Created", imageCreated)
@@ -275,12 +275,17 @@ func getImageCreatedAt(ctx context.Context, cache *cache.Cache, l logr.Logger, c
 	}
 
 	l.Info("Inspecting image", "Name", container.Name, "ImageID", container.ImageID)
-	imgInspect, err := inspectImage(ctx, &container, node.Labels["kubernetes.io/os"], node.Labels["kubernetes.io/arch"])
+	imgInspect, err := inspectImage(ctx, &container, node.Labels["kubernetes.io/os"], node.Labels["kubernetes.io/arch"], opts.DockerAuthConfigPath)
 	if err != nil {
 		return nil, err
 	}
+
+	if imgInspect.Created.IsZero() {
+		return nil, fmt.Errorf("image creation date is zero")
+	}
+
 	l.Info("Image inspected", "Name", container.Name, "ImageID", container.ImageID, "Created", imgInspect.Created)
 
-	cache.Set(container.ImageID, *imgInspect.Created, cacheExpiration)
+	cache.Set(container.ImageID, *imgInspect.Created, &opts.CacheExpiration)
 	return imgInspect.Created, nil
 }

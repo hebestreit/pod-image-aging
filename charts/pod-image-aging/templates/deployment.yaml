@@ -36,6 +36,12 @@ spec:
           args:
             - "--leader-elect"
             - "--health-probe-bind-address=:{{ .Values.service.port }}"
+            - "--include-namespaces={{ .Values.includeNamespaces }}"
+            - "--exclude-namespaces={{ .Values.excludeNamespaces }}"
+            - "--include-images={{ .Values.includeImages }}"
+            - "--exclude-images={{ .Values.excludeImages }}"
+            - "--cache-expiration={{ .Values.cacheExpiry }}"
+            - "--docker-auth-config-path={{ .Values.dockerAuthConfigPath }}"
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
@@ -54,6 +60,13 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.dockerAuthSecretName}}
+          volumeMounts:
+            - name: docker-auth
+              mountPath: {{ .Values.dockerAuthConfigPath }}
+              readOnly: true
+              subPath: .dockerconfigjson
+          {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -67,3 +80,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- if .Values.dockerAuthSecretName }}
+      volumes:
+        - name: docker-auth
+          secret:
+            secretName: {{ .Values.dockerAuthSecretName }}
+      {{- end }}

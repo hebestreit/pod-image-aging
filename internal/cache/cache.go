@@ -23,12 +23,12 @@ func NewCache() *Cache {
 }
 
 // Set a key-value pair with expiration time (in seconds)
-func (c *Cache) Set(key string, value time.Time, duration time.Duration) {
+func (c *Cache) Set(key string, value time.Time, duration *time.Duration) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.data[key] = CacheItem{
 		Value:      value,
-		Expiration: time.Now().Add(duration).Unix(),
+		Expiration: time.Now().Add(*duration).Unix(),
 	}
 }
 

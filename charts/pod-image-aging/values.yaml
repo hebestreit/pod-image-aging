@@ -1,3 +1,11 @@
+includeNamespaces: "" # "kube-system,default"
+excludeNamespaces: "" # "kube-system,default"
+includeImages: "" # "hebestreit/pod-image-aging:*"
+excludeImages: "" # "066635153087.dkr.ecr.il-central-1.amazonaws.com/*,602401143452.dkr.ecr.eu-central-1.amazonaws.com/*"
+cacheExpiry: "168h" # as time duration
+dockerAuthSecretName: ""
+dockerAuthConfigPath: "/.docker/config.json"
+
 # Default values for pod-image-aging.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
@@ -10,7 +18,7 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
-imagePullSecrets: []
+imagePullSecrets: [ ]
 nameOverride: ""
 fullnameOverride: ""
 
@@ -18,12 +26,12 @@ serviceAccount:
   # Specifies whether a service account should be created
   create: true
   # Annotations to add to the service account
-  annotations: {}
+  annotations: { }
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
-podAnnotations: {}
+podAnnotations: { }
 
 podSecurityContext:
   runAsNonRoot: true
@@ -46,11 +54,11 @@ service:
   port: 8081
 
 resources:
-   limits:
-     memory: 128Mi
-   requests:
-     cpu: 50m
-     memory: 128Mi
+  limits:
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
 
 autoscaling:
   enabled: false
@@ -59,10 +67,10 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
-nodeSelector: {}
+nodeSelector: { }
 
-tolerations: []
+tolerations: [ ]
 
-affinity: {}
+affinity: { }
 
 terminationGracePeriodSeconds: 10

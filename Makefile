@@ -76,6 +76,14 @@ lint: golangci-lint ## Run golangci-lint linter
 lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
+.PHONY: k3d-import
+k3d-import: docker-build
+	k3d image import ${IMG}
+
+.PHONY: helm-install
+helm-install: k3d-import
+	helm upgrade --install pod-image-aging charts/pod-image-aging --set image.tag="latest" --set dockerAuthSecretName=pod-image-aging-docker-auth
+
 ##@ Build
 
 .PHONY: build
@@ -114,11 +122,6 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	- $(CONTAINER_TOOL) buildx rm pod-image-aging-builder
 	rm Dockerfile.cross
 
-.PHONY: build-installer
-build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
-	mkdir -p dist
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default > dist/install.yaml
 
 ##@ Deployment
 

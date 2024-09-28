@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -58,18 +59,19 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
-	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
-		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
+	var controllerOpts = &controller.Opts{}
+	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&secureMetrics, "metrics-secure", true,
-		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
-	flag.BoolVar(&enableHTTP2, "enable-http2", false,
-		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	// TODO add custom flags here and pass as opts to the reconciler
-	// TODO --include-namespaces, --exclude-namespaces, --include-images, --exclude-images and --cache-expiration
+	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&secureMetrics, "metrics-secure", true, "If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
+	flag.BoolVar(&enableHTTP2, "enable-http2", false, "If set, HTTP/2 will be enabled for the metrics and webhook servers")
+
+	flag.StringVar(&controllerOpts.IncludeNamespacesFilter, "include-namespaces", "", "Comma-separated list of namespaces to include")
+	flag.StringVar(&controllerOpts.ExcludeNamespacesFilter, "exclude-namespaces", "", "Comma-separated list of namespaces to exclude")
+	flag.StringVar(&controllerOpts.IncludeImagesFilter, "include-images", "", "Regular expression to include images")
+	flag.StringVar(&controllerOpts.ExcludeImagesFilter, "exclude-images", "", "Regular expression to exclude images")
+	flag.DurationVar(&controllerOpts.CacheExpiration, "cache-expiration", 168*time.Hour, "Expiration time for the cache")
+	flag.StringVar(&controllerOpts.DockerAuthConfigPath, "docker-auth-config-path", "", "Path to the Docker auth config")
 
 	opts := zap.Options{
 		Development: true,
@@ -152,6 +154,7 @@ func main() {
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 		Cache:  memoryCache,
+		Opts:   controllerOpts,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Pod")
 		os.Exit(1)

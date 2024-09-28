@@ -1,22 +1,25 @@
 # pod-image-aging
 
-The `pod-image-aging` Kubernetes controller tracks the age of your pod's container images and stores the created at timestamp inside an annotation. 
-This information can be useful to track the age of the images in your pods and help you to identify the pods that are running old images.
+The `pod-image-aging` Kubernetes controller tracks the age of your pod's container images and stores the created at
+timestamp inside an annotation. This information can be useful to know the age of your pod images and help you to
+identify the pods that are running old images.
 
 ## Description
 
-The `pod-image-aging` controller watches for pods in your cluster and extracts the image information from the pod's spec to fetch the created at timestamp from the corresponding container image registry.
+The `pod-image-aging` controller watches for pods in your cluster and extracts the image information from the pod's spec
+to fetch the created at timestamp from the corresponding container image registry.
 
-Once annotated you can inspect your pod and get the image creation timestamp of all `containers` and `initContainers` from the `pod-image-aging.hbst.io/status` annotation.
+Once annotated you can inspect your pod and get the image creation timestamp of all `containers` and `initContainers`
+from the `pod-image-aging.hbst.io/status` annotation.
 
 ```yaml
-apiVersion: v1                                                                                                                                                                          
-kind: Pod                                                                                                                                                                               
-metadata:                                                                                                                                                                               
-  annotations:                                                                                                                                                                          
-    pod-image-aging.hbst.io/status: '{"containers":[{"name":"pod-image-aging","createdAt":"2024-09-08T06:45:26Z"}]}'                                                                  
-  name: pod-image-aging-6f6b769dd6-fnplf                                                                                                                                                
-  namespace: default   
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    pod-image-aging.hbst.io/status: '{"containers":[{"name":"pod-image-aging","createdAt":"2024-09-08T06:45:26Z"}]}'
+  name: pod-image-aging-6f6b769dd6-fnplf
+  namespace: default
 spec:
   containers:
     - image: hebestreit/pod-image-aging:0.0.1
@@ -24,58 +27,122 @@ spec:
 # ...                 
 ```
 
-If you want to get an overview of all pods and their image creation timestamps, you can execute the following command using `kubectl` and `jq`:
+If you want to get an overview of all pods and their image creation timestamps, you can pipe the output
+of `kubectl get pods -A -o json` to the `format.sh` script:
 
-```
-$  kubectl get pods -A -o json | jq '[. | {pod: .items[].metadata}][] | {name: .pod.name, namespace: .pod.namespace, images: .pod.annotations["pod-image-aging.hbst.io/status"] | fromjson}'
-
-{
-  "name": "metrics-server-648b5df564-fz9hd",
-  "namespace": "kube-system",
-  "images": {
-    "containers": [
-      {
-        "name": "metrics-server",
-        "createdAt": "2023-03-21T13:21:03.301449922Z"
-      }
-    ]
-  }
-}
-{
-  "name": "traefik-64f55bb67d-n548j",
-  "namespace": "kube-system",
-  "images": {
-    "containers": [
-      {
-        "name": "traefik",
-        "createdAt": "2023-04-06T18:51:04.986454508Z"
-      }
-    ]
-  }
-}
-{
-  "name": "pod-image-aging-6f6b769dd6-fnplf",
-  "namespace": "default",
-  "images": {
-    "containers": [
-      {
-        "name": "pod-image-aging",
-        "createdAt": "2024-09-08T06:45:26Z"
-      }
-    ]
-  }
-}
+```shell
+kubectl get pods -A -o json | ./format.sh
+NAMESPACE    NAME                                    CONTAINER               IMAGE                                    IMAGE AGE
+kube-system  coredns-77ccd57875-dbpl6                coredns                 rancher/mirrored-coredns-coredns:1.10.1  85 weeks
+kube-system  metrics-server-648b5df564-fg44m         metrics-server          rancher/mirrored-metrics-server:v0.6.3   79 weeks
+kube-system  local-path-provisioner-957fdf8bc-ll5dv  local-path-provisioner  rancher/local-path-provisioner:v0.0.24   79 weeks
+kube-system  traefik-64f55bb67d-jd5x2                traefik                 rancher/mirrored-library-traefik:2.9.10  77 weeks
+kube-system  svclb-traefik-6234005d-x6s87            lb-tcp-80               rancher/klipper-lb:v0.4.4                70 weeks
+kube-system  svclb-traefik-6234005d-x6s87            lb-tcp-443              rancher/klipper-lb:v0.4.4                70 weeks
 ```
 
 ## Getting Started
 
+Since the Helm chart is not pushed to a public repository yet, you need to clone the repository:
+
+```shell
+git clone git@github.com:hebestreit/pod-image-aging.git
+```
+
+### Create a secret for the container registry
+
+In order to fetch the image creation timestamp from private container registries or to prevent running into the
+DockerHub rate limit issue, you need to create a secret with the credentials first.
+
+```shell
+NAMESPACE="default"
+DOCKER_REGISTRY_SERVER="https://index.docker.io/v1/"
+DOCKER_USERNAME="docker-username"
+DOCKER_PASSWORD="docker-password"
+DOCKER_EMAIL="docker-email"
+
+kubectl -n $NAMESPACE create secret docker-registry pod-image-aging-docker-auth \
+  --docker-server=DOCKER_REGISTRY_SERVER \
+  --docker-username=$DOCKER_USERNAME \
+  --docker-password=$DOCKER_PASSWORD \
+  --docker-email=$DOCKER_EMAIL
+```
+
+If you want to add multiple entries for different registries, you can temporarily store the content of the secret in a
+file and create the secret from that file instead:
+
+```shell
+NAMESPACE="default"
+GITLAB_USERNAME="gitlab-username"
+GITLAB_PASSWORD="gitlab-password"
+GITLAB_EMAIL="gitlab-email"
+GITLAB_AUTH=$(echo -n "$GITLAB_USERNAME:$GITLAB_PASSWORD" | base64)
+
+DOCKER_USERNAME="docker-username"
+DOCKER_PASSWORD="docker-password"
+DOCKER_EMAIL="docker-email"
+DOCKER_AUTH=$(echo -n "$DOCKER_USERNAME:$DOCKER_PASSWORD" | base64)
+
+cat <<EOF > .dockerconfigjson
+{
+  "auths": {
+    "registry.gitlab.com": {
+      "username": "$GITLAB_USERNAME",
+      "password": "$GITLAB_PASSWORD",
+      "email": "$GITLAB_EMAIL",
+      "auth": "$GITLAB_AUTH"
+    },
+    "https://index.docker.io/v1/": {
+      "username": "$DOCKER_USERNAME",
+      "password": "$DOCKER_PASSWORD",
+      "email": "$DOCKER_EMAIL",
+      "auth": "$DOCKER_AUTH"
+    }
+  }
+}
+EOF
+```
+
+Create the secret from the above file:
+
+```shell
+kubectl -n $NAMESPACE create secret generic pod-image-aging-docker-auth --type=kubernetes.io/dockerconfigjson --from-file=.dockerconfigjson=.dockerconfigjson
+```
+
+### Install using Helm
+
+To install the `pod-image-aging` controller using Helm, you can use the following command and reference the name of the
+secret you created in the previous step:
+
+```shell
+NAMESPACE="default"
+helm upgrade -n $NAMESPACE --install pod-image-aging ./charts/pod-image-aging --set dockerAuthSecretName=pod-image-aging-docker-auth
+```
+
+### Uninstall using Helm
+
+To uninstall the `pod-image-aging` controller, you can use the following command:
+
+```shell
+NAMESPACE="default"
+helm uninstall -n $NAMESPACE pod-image-aging
+```
+
+# Development
+
+Contributions are welcome!
+
+## Getting Started
+
 ### Prerequisites
+
 - go version v1.22.0+
 - docker version 17.03+.
 - kubectl version v1.11.3+.
 - Access to a Kubernetes v1.11.3+ cluster.
 
 ### To Deploy on the cluster
+
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
@@ -93,7 +160,7 @@ make deploy IMG=<some-registry>/pod-image-aging:tag
 ```
 
 > **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
+> privileges or be logged in as admin.
 
 **Create instances of your solution**
 You can apply the samples (examples) from the config/sample:
@@ -102,9 +169,10 @@ You can apply the samples (examples) from the config/sample:
 kubectl apply -k config/samples/
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
+> **NOTE**: Ensure that the samples has default values to test it out.
 
 ### To Uninstall
+
 **Delete the instances (CRs) from the cluster:**
 
 ```sh
@@ -117,31 +185,7 @@ kubectl delete -k config/samples/
 make undeploy
 ```
 
-## Project Distribution
-
-Following are the steps to build the installer and distribute this project to users.
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/pod-image-aging:tag
-```
-
-NOTE: The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without
-its dependencies.
-
-2. Using the installer
-
-Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/pod-image-aging/<tag or branch>/dist/install.yaml
-```
-
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
 
 **NOTE:** Run `make help` for more information on all potential `make` targets
 
