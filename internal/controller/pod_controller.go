@@ -86,6 +86,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	if pod.Annotations[getAnnotationKey("status")] != "" ||
 		pod.Annotations[getAnnotationKey("ignore")] == "true" ||
+		pod.ObjectMeta.DeletionTimestamp != nil ||
 		pod.Status.Phase != corev1.PodRunning {
 		return ctrl.Result{}, nil
 	}
