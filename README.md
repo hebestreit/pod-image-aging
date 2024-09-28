@@ -28,10 +28,10 @@ spec:
 ```
 
 If you want to get an overview of all pods and their image creation timestamps, you can pipe the output
-of `kubectl get pods -A -o json` to the `format.sh` script:
+of `kubectl get pods -A -o json` to the `hack/format.sh` script:
 
 ```shell
-kubectl get pods -A -o json | ./format.sh
+kubectl get pods -A -o json | ./hack/format.sh
 NAMESPACE    NAME                                    CONTAINER               IMAGE                                    IMAGE AGE
 kube-system  coredns-77ccd57875-dbpl6                coredns                 rancher/mirrored-coredns-coredns:1.10.1  85 weeks
 kube-system  metrics-server-648b5df564-fg44m         metrics-server          rancher/mirrored-metrics-server:v0.6.3   79 weeks
@@ -116,8 +116,24 @@ secret you created in the previous step:
 
 ```shell
 NAMESPACE="default"
-helm upgrade -n $NAMESPACE --install pod-image-aging ./charts/pod-image-aging --set dockerAuthSecretName=pod-image-aging-docker-auth
+helm upgrade -n $NAMESPACE \
+  --install pod-image-aging ./charts/pod-image-aging \
+  --set dockerAuthSecretName=pod-image-aging-docker-auth
 ```
+
+#### Parameters
+
+The following table lists the configurable parameters of the `pod-image-aging` chart and their default values:
+
+| Name                   | Description                                              | Example                                                                                                 | Value                    |
+|------------------------|----------------------------------------------------------|---------------------------------------------------------------------------------------------------------|--------------------------|
+| `includeNamespaces`    | Comma-separated list of namespaces to include.           | `"kube-system,default"`                                                                                 | `""`                     |
+| `excludeNamespaces`    | Comma-separated list of namespaces to exclude.           | `"kube-system,default"`                                                                                 | `""`                     |
+| `includeImages`        | Comma-separated list of images to include.               | `"hebestreit/pod-image-aging:*"`                                                                        | `""`                     |
+| `excludeImages`        | Comma-separated list of images to exclude.               | `"066635153087.dkr.ecr.il-central-1.amazonaws.com/*,602401143452.dkr.ecr.eu-central-1.amazonaws.com/*"` | `""`                     |
+| `cacheExpiry`          | Cache expiry time.                                       | `"168h"`                                                                                                | `"168h"`                 |
+| `dockerAuthSecretName` | Name of the secret with the Docker registry credentials. | `"pod-image-aging-docker-auth"`                                                                         | `""`                     |
+| `dockerAuthConfigPath` | Path to the Docker config file.                          | `"/.docker/config.json"`                                                                                | `"/.docker/config.json"` |
 
 ### Uninstall using Helm
 
