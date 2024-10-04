@@ -32,13 +32,20 @@ of `kubectl get pods -A -o json` to the `hack/format.sh` script:
 
 ```shell
 kubectl get pods -A -o json | ./hack/format.sh
+Fri Oct  4 17:31:15 CEST 2024
+
 NAMESPACE    NAME                                    CONTAINER               IMAGE                                    IMAGE AGE
-kube-system  coredns-77ccd57875-dbpl6                coredns                 rancher/mirrored-coredns-coredns:1.10.1  85 weeks
-kube-system  metrics-server-648b5df564-fg44m         metrics-server          rancher/mirrored-metrics-server:v0.6.3   79 weeks
-kube-system  local-path-provisioner-957fdf8bc-ll5dv  local-path-provisioner  rancher/local-path-provisioner:v0.0.24   79 weeks
-kube-system  traefik-64f55bb67d-jd5x2                traefik                 rancher/mirrored-library-traefik:2.9.10  77 weeks
-kube-system  svclb-traefik-6234005d-x6s87            lb-tcp-80               rancher/klipper-lb:v0.4.4                70 weeks
-kube-system  svclb-traefik-6234005d-x6s87            lb-tcp-443              rancher/klipper-lb:v0.4.4                70 weeks
+kube-system  coredns-77ccd57875-4ph22                coredns                 rancher/mirrored-coredns-coredns:1.10.1  86 weeks
+kube-system  metrics-server-648b5df564-cz6hm         metrics-server          rancher/mirrored-metrics-server:v0.6.3   80 weeks
+kube-system  local-path-provisioner-957fdf8bc-774mc  local-path-provisioner  rancher/local-path-provisioner:v0.0.24   80 weeks
+kube-system  traefik-64f55bb67d-qkqtr                traefik                 rancher/mirrored-library-traefik:2.9.10  78 weeks
+kube-system  svclb-traefik-6234005d-h72q9            lb-tcp-80               rancher/klipper-lb:v0.4.4                70 weeks
+kube-system  svclb-traefik-6234005d-h72q9            lb-tcp-443              rancher/klipper-lb:v0.4.4                70 weeks
+
+NAMESPACE    IMAGE AGE (avg)
+kube-system  77 weeks
+
+Overall average: 77.30 weeks
 ```
 
 ## Getting Started
