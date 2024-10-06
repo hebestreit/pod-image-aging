@@ -5,4 +5,4 @@ sources:
   - https://github.com/hebestreit/pod-image-aging
 type: application
 version: 0.1.0
-appVersion: "0.0.1"
+appVersion: "0.0.2"
