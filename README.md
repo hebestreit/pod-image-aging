@@ -48,6 +48,8 @@ kube-system  77 weeks
 Overall average: 77.30 weeks
 ```
 
+Checkout the [Metrics](#metrics) section how to view the pod image age in Grafana over time.
+
 ## Getting Started
 
 Since the Helm chart is not pushed to a public repository yet, you need to clone the repository:
