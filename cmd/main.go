@@ -17,9 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -60,6 +64,7 @@ func main() {
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
 	var controllerOpts = &controller.Opts{}
+	var metricsInterval time.Duration
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
@@ -72,6 +77,7 @@ func main() {
 	flag.StringVar(&controllerOpts.ExcludeImagesFilter, "exclude-images", "", "Regular expression to exclude images")
 	flag.DurationVar(&controllerOpts.CacheExpiration, "cache-expiration", 168*time.Hour, "Expiration time for the cache")
 	flag.StringVar(&controllerOpts.DockerAuthConfigPath, "docker-auth-config-path", "", "Path to the Docker auth config")
+	flag.DurationVar(&metricsInterval, "metrics-interval", 30*time.Minute, "Interval to update the metrics")
 
 	opts := zap.Options{
 		Development: true,
@@ -170,9 +176,50 @@ func main() {
 		os.Exit(1)
 	}
 
+	if metricsAddr != "0" {
+		// TODO use Runnable instead of goroutine to make sure it's gracefully stopped when the manager stops
+		metricsClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{})
+		if err != nil {
+			setupLog.Error(err, "unable to create client for metrics")
+			os.Exit(1)
+		}
+		go startMetricsUpdater(metricsClient, ctrl.Log.WithName("metrics"), metricsInterval)
+	}
+
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
+	}
+}
+
+// startMetricsUpdater runs a periodic job to update the custom metrics
+func startMetricsUpdater(c client.Client, log logr.Logger, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		// Call the updateMetrics function periodically
+		log.Info("Updating metrics...")
+		namespaces := &corev1.NamespaceList{}
+		err := c.List(context.Background(), namespaces)
+		if err != nil {
+			log.Error(err, "failed to list namespaces")
+			continue
+		}
+
+		for _, namespace := range namespaces.Items {
+			if err := controller.UpdateMetrics(c, namespace.Name, log); err != nil {
+				log.Error(err, "failed to update metrics for namespace", "namespace", namespace.Name)
+			}
+		}
+
+		select {
+		case <-ticker.C:
+			continue
+		case <-context.Background().Done():
+			log.Info("Metrics updater stopped")
+			return
+		}
 	}
 }

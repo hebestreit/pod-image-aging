@@ -113,7 +113,9 @@ EOF
 Create the secret from the above file:
 
 ```shell
-kubectl -n $NAMESPACE create secret generic pod-image-aging-docker-auth --type=kubernetes.io/dockerconfigjson --from-file=.dockerconfigjson=.dockerconfigjson
+kubectl -n $NAMESPACE create secret generic pod-image-aging-docker-auth \
+  --type=kubernetes.io/dockerconfigjson \
+  --from-file=.dockerconfigjson=.dockerconfigjson
 ```
 
 ### Install using Helm
@@ -150,6 +152,53 @@ To uninstall the `pod-image-aging` controller, you can use the following command
 NAMESPACE="default"
 helm uninstall -n $NAMESPACE pod-image-aging
 ```
+
+## Metrics
+
+The `pod-image-aging` controller exposes a few metrics which can be scraped by Prometheus to visualize the image age
+over time or to define alerts based on your company's policies.
+
+Recommended configuration to use with the Prometheus Operator:
+
+```yaml
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+dashboards:
+  enabled: true
+```
+
+You can enable the metrics by setting the `metrics.enabled` property to `true`.
+
+If enabled the below metrics will be evaluated in an interval of 30 minutes. It's designed in this way to reduce the
+load on the Kubernetes API and it's more likely that the pods are less frequently updated. You can change the interval
+by setting the `metrics.interval` to a lower or higher value.
+
+| Metric                             | Description                           | Labels               |
+|------------------------------------|---------------------------------------|----------------------|
+| `pod_image_aging_youngest_seconds` | Age of the youngest image in seconds. | `exported_namespace` |
+| `pod_image_aging_oldest_seconds`   | Age of the oldest image in seconds.   | `exported_namespace` |
+| `pod_image_aging_average_seconds`  | Average age of all images in seconds. | `exported_namespace` |
+
+### ServiceMonitor
+
+If you're using the Prometheus Operator
+a [ServiceMonitor](https://github.com/prometheus-operator/prometheus-operator/blob/main/Documentation/api.md#servicemonitor)
+resource can be created to automatically scrape the metrics by setting `metrics.serviceMonitor.enabled=true`.
+
+### Grafana Dashboard
+
+When using the official Grafana Helm chart you can automatically import the dashboard by setting
+`dashboards.enabled=true`. This will create a ConfigMap with the dashboard definition which will be imported by the
+sidecar container `grafana-sc-dashboard`.
+
+https://github.com/grafana/helm-charts/tree/main/charts/grafana#sidecar-for-dashboards
+
+Otherwise if you want to import the file manually take a look inside
+the [charts/pod-image-aging/dashboards](charts/pod-image-aging/dashboards) folder for the JSON file.
+
+![grafana-dashboard](docs/assets/grafana-dashboard.png)
 
 # Development
 

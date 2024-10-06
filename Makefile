@@ -82,7 +82,12 @@ k3d-import: docker-build
 
 .PHONY: helm-install
 helm-install: k3d-import
-	helm upgrade --install pod-image-aging charts/pod-image-aging --set image.tag="latest" --set dockerAuthSecretName=pod-image-aging-docker-auth
+	helm upgrade --install pod-image-aging charts/pod-image-aging --set image.tag="latest" --set dockerAuthSecretName=pod-image-aging-docker-auth --set metrics.enabled=true --set metrics.serviceMonitor.enabled=true --set dashboards.enabled=true
+
+.PHONY: helm-install-monitoring
+helm-install-monitoring:
+	kubectl create namespace monitoring || true
+	helm upgrade --install -n monitoring kube-prometheus-stack prometheus-community/kube-prometheus-stack --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false
 
 ##@ Build
 

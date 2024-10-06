@@ -74,3 +74,20 @@ tolerations: [ ]
 affinity: { }
 
 terminationGracePeriodSeconds: 10
+
+metrics:
+  enabled: false
+  secure: "false"
+  bindAddress: "8080"
+  interval: "30m"
+
+  serviceMonitor:
+    enabled: false
+    interval: ""
+    additionalLabels: { }
+    annotations: { }
+    # scrapeTimeout: 10s
+
+dashboards:
+  enabled: false
+  namespace: ""

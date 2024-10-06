@@ -42,10 +42,20 @@ spec:
             - "--exclude-images={{ .Values.excludeImages }}"
             - "--cache-expiration={{ .Values.cacheExpiry }}"
             - "--docker-auth-config-path={{ .Values.dockerAuthConfigPath }}"
+            {{- if .Values.metrics.enabled }}
+            - "--metrics-secure={{ .Values.metrics.secure }}"
+            - "--metrics-bind-address=:{{ .Values.metrics.bindAddress }}"
+            - "--metrics-interval={{ .Values.metrics.interval }}"
+            {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.bindAddress }}
+              protocol: TCP
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz

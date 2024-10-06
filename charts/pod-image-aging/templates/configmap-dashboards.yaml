@@ -1,0 +1,21 @@
+{{- if .Values.dashboards.enabled -}}
+{{ $root := . }}
+{{- $namespace := .Values.dashboards.namespace | default $.Release.Namespace }}
+{{- $files := .Files }}
+{{- range $path, $_ :=  .Files.Glob  "dashboards/*.json" }}
+{{ $file := $path | base }}
+{{ $name := print ($file | trimSuffix ".json")  "-dashboard" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  namespace: {{ $namespace }}
+  labels:
+    grafana_dashboard: "1"
+    {{- include "pod-image-aging.labels" $root | nindent 4 }}
+data:
+  {{ $file }}: |-
+{{ $.Files.Get $path | indent 4 }}
+---
+{{- end }}
+{{- end -}}

@@ -5,6 +5,15 @@ metadata:
   labels:
     {{- include "pod-image-aging.labels" . | nindent 4 }}
 rules:
+  {{- if .Values.metrics.enabled }}
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - get
+      - list
+  {{ end }}
   - apiGroups:
       - ""
     resources:

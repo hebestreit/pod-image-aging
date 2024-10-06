@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	types2 "k8s.io/apimachinery/pkg/types"
-	"regexp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -37,10 +36,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-)
-
-const (
-	domain = "pod-image-aging.hbst.io"
 )
 
 // PodReconciler reconciles a Pod object
@@ -71,6 +66,7 @@ type Container struct {
 }
 
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;patch
 // +kubebuilder:rbac:groups=core,resources=pods/status,verbs=get
 
@@ -84,10 +80,7 @@ func (r *PodReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if pod.Annotations[getAnnotationKey("status")] != "" ||
-		pod.Annotations[getAnnotationKey("ignore")] == "true" ||
-		pod.ObjectMeta.DeletionTimestamp != nil ||
-		pod.Status.Phase != corev1.PodRunning {
+	if ignorePod(pod) {
 		return ctrl.Result{}, nil
 	}
 
@@ -231,41 +224,6 @@ func inspectImage(ctx context.Context, container *corev1.ContainerStatus, os, ar
 	}
 
 	return imgInspect, nil
-}
-
-func getAnnotationKey(path string) string {
-	return fmt.Sprintf("%s/%s", domain, path)
-}
-
-// wildCardToRegexp converts a wildcard pattern to a regular expression pattern.
-func wildCardToRegexp(pattern string) string {
-	components := strings.Split(pattern, "*")
-	if len(components) == 1 {
-		// if len is 1, there are no *'s, return exact match pattern
-		return "^" + pattern + "$"
-	}
-	var result strings.Builder
-	for i, literal := range components {
-
-		// Replace * with .*
-		if i > 0 {
-			result.WriteString(".*")
-		}
-
-		// Quote any regular expression meta characters in the
-		// literal text.
-		result.WriteString(regexp.QuoteMeta(literal))
-	}
-	return "^" + result.String() + "$"
-}
-
-func isImageInWildcardFilter(image string, wildcardFilters []string) bool {
-	for _, wildcardFilter := range wildcardFilters {
-		if result, _ := regexp.MatchString(wildCardToRegexp(wildcardFilter), image); result {
-			return true
-		}
-	}
-	return false
 }
 
 func getImageCreatedAt(ctx context.Context, cache *cache.Cache, l logr.Logger, container corev1.ContainerStatus, node corev1.Node, opts *Opts) (*time.Time, error) {
